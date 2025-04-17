@@ -8,7 +8,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "expo": "~52.0.43",
+    "expo": "~52.0.46",
     "expo-status-bar": "~2.0.1",
     "react": "18.3.1",
     "react-native": "0.76.9",
@@ -17,6 +17,7 @@
     "react-native-paper": "4.9.2",
     "react-native-screens": "~4.4.0",
     "@react-navigation/native": "*",
+    "react-native-vector-icons": "*",
     "@react-navigation/native-stack": "*",
     "react-native-safe-area-context": "4.12.0"
   },
