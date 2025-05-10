@@ -10,6 +10,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { Video } from 'expo-av';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase'; // Adjust the path based on your project structure
 
 import CustomInput from '../components/CustomInput';
 
@@ -19,45 +21,43 @@ export default function SignInScreen({ navigation }) {
   const [validEmail, setValidEmail] = useState(true);
   const [validPassword, setValidPassword] = useState(true);
 
-  const validate = () => {
-    console.log('Validation triggered');
-
+  const validateAndLogin = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const isEmailValid = emailRegex.test(email);
-
     const passwordRegex =
       /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/;
+
+    const isEmailValid = emailRegex.test(email);
     const isPasswordValid = passwordRegex.test(password);
 
     setValidEmail(isEmailValid);
     setValidPassword(isPasswordValid);
 
-    console.log('Email valid:', isEmailValid);
-    console.log('Password valid:', isPasswordValid);
-
     if (!isEmailValid) {
-      Alert.alert('Invalid Email', 'Email should be in a valid format like a@example.com.');
+      Alert.alert('Invalid Email', 'Use a valid email like example@domain.com.');
       return;
     }
 
     if (!isPasswordValid) {
       Alert.alert(
         'Weak Password',
-        'Password must be at least 8 characters and include numbers, letters, and special characters.'
+        'Password must be at least 8 characters with numbers, letters, and a special character.'
       );
       return;
     }
 
-    navigation.navigate('Home');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      navigation.navigate('Home');
+    } catch (error) {
+      Alert.alert('Login Failed', error.message);
+    }
   };
 
   return (
     <View style={styles.container}>
       {Platform.OS !== 'web' && (
         <Video
-          source={{
-            uri: 'https://cdn.pixabay.com/video/2022/07/20/124831-732633121_large.mp4',
-          }}
+          source={{ uri: 'https://cdn.pixabay.com/video/2022/07/20/124831-732633121_large.mp4' }}
           style={StyleSheet.absoluteFillObject}
           resizeMode="cover"
           shouldPlay
@@ -65,7 +65,6 @@ export default function SignInScreen({ navigation }) {
           isMuted
         />
       )}
-
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -93,7 +92,7 @@ export default function SignInScreen({ navigation }) {
             isValid={validPassword}
           />
 
-          <TouchableOpacity style={styles.button} onPress={validate}>
+          <TouchableOpacity style={styles.button} onPress={validateAndLogin}>
             <Text style={styles.buttonText}>Sign In</Text>
           </TouchableOpacity>
 

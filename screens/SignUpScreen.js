@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Video } from 'expo-av';
 import CustomInput from '../components/CustomInput';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
 
 export default function SignUpScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -20,55 +22,52 @@ export default function SignUpScreen({ navigation }) {
   const [validPassword, setValidPassword] = useState(true);
   const [validConfirm, setValidConfirm] = useState(true);
 
-  const validate = () => {
-    console.log('Validation triggered');
-
+  const validateAndRegister = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const isEmailValid = emailRegex.test(email);
-
     const passwordRegex =
       /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/;
-    const isPasswordValid = passwordRegex.test(password);
 
+    const isEmailValid = emailRegex.test(email);
+    const isPasswordValid = passwordRegex.test(password);
     const isConfirmValid = password === confirm;
 
     setValidEmail(isEmailValid);
     setValidPassword(isPasswordValid);
     setValidConfirm(isConfirmValid);
 
-    console.log('Email valid:', isEmailValid);
-    console.log('Password valid:', isPasswordValid);
-    console.log('Confirm valid:', isConfirmValid);
-
     if (!isEmailValid) {
-      Alert.alert('Invalid Email', 'Email should be in a valid format like a@example.com.');
+      Alert.alert('Invalid Email', 'Use a valid email like example@domain.com.');
       return;
     }
 
     if (!isPasswordValid) {
       Alert.alert(
         'Weak Password',
-        'Password must be at least 8 characters and include numbers, letters, and special characters.'
+        'Password must be at least 8 characters with numbers, letters, and a special character.'
       );
       return;
     }
 
     if (!isConfirmValid) {
-      Alert.alert('Password Mismatch', 'Confirm password must match the password.');
+      Alert.alert('Password Mismatch', 'Passwords do not match.');
       return;
     }
 
-    // All validations passed, navigate to Home screen
-    navigation.navigate('Home');
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      console.log("Signup Success:", userCredential.user);
+      navigation.navigate('SignInScreen'); // Ensure 'Home' exists in your navigation stack
+    } catch (error) {
+      console.log("Signup Error:", error.message);
+      Alert.alert('Registration Failed', error.message);
+    }
   };
 
   return (
     <View style={styles.container}>
       {Platform.OS !== 'web' && (
         <Video
-          source={{
-            uri: 'https://cdn.pixabay.com/video/2022/07/20/124831-732633121_large.mp4',
-          }}
+          source={{ uri: 'https://cdn.pixabay.com/video/2022/07/20/124831-732633121_large.mp4' }}
           style={StyleSheet.absoluteFillObject}
           resizeMode="cover"
           shouldPlay
@@ -76,7 +75,6 @@ export default function SignUpScreen({ navigation }) {
           isMuted
         />
       )}
-
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -114,7 +112,7 @@ export default function SignUpScreen({ navigation }) {
             isValid={validConfirm}
           />
 
-          <TouchableOpacity style={styles.button} onPress={validate}>
+          <TouchableOpacity style={styles.button} onPress={validateAndRegister}>
             <Text style={styles.buttonText}>Sign Up</Text>
           </TouchableOpacity>
 

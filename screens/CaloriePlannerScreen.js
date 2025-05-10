@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,142 +7,49 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Button from '../components/Button'; // Adjust path to match your project structure
+import { db } from '../firebase'; // Adjust path to your firebase.js file
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function CaloriePlannerScreen() {
+  const navigation = useNavigation();
   const [target, setTarget] = useState('');
   const [suggestions, setSuggestions] = useState([]);
 
-  const suggestMeals = () => {
+  const suggestMeals = async () => {
     const val = parseInt(target);
-    const newSuggestions = [];
-
     if (!val || val <= 0) {
       setSuggestions([]);
       return;
     }
 
-    if (val < 400) {
-      newSuggestions.push({
-        icon: 'food-apple-outline',
-        text: 'Smoothie + Nuts',
-        description:
-          'Blend 1 banana, 1/2 cup almond milk, and 1/2 cup frozen berries to create a quick and refreshing smoothie. Serve it with a handful of almonds or walnuts for a balance of carbs, protein, and healthy fats.',
-      });
-      newSuggestions.push({
-        icon: 'leaf',
-        text: 'Yogurt Parfait',
-        description:
-          'Layer 1 cup of low-fat yogurt with 1/4 cup granola, 1 tbsp chia seeds, and a handful of fresh berries like strawberries or blueberries. A perfect light and refreshing snack or breakfast.',
-      });
-      newSuggestions.push({
-        icon: 'apple',
-        text: 'Fruit Bowl',
-        description:
-          'Dice a mix of seasonal fruits such as apples, oranges, bananas, and berries. Add a squeeze of lemon juice and a pinch of cinnamon for added flavor and freshness.',
-      });
-    } else if (val < 700) {
-      newSuggestions.push({
-        icon: 'leaf',
-        text: 'Salad + Boiled Eggs',
-        description:
-          'Toss together fresh spinach, cherry tomatoes, cucumbers, and a light drizzle of olive oil. Add two boiled eggs sliced on top for protein. Optionally sprinkle with black pepper or a dash of lemon juice.',
-      });
-      newSuggestions.push({
-        icon: 'food-steak',
-        text: 'Chicken Caesar Salad',
-        description:
-          'Grill one chicken breast, slice it, and toss with romaine lettuce, croutons, a sprinkle of parmesan cheese, and 2 tbsp of Caesar dressing. Serve chilled or warm.',
-      });
-      newSuggestions.push({
-        icon: 'food-croissant',
-        text: 'Turkey Sandwich',
-        description:
-          'Use whole grain bread and layer with 2 slices of turkey breast, a lettuce leaf, tomato slices, and a thin layer of mustard or light mayo. Serve with a side of sliced cucumbers.',
-      });
-    } else if (val < 1000) {
-      newSuggestions.push({
-        icon: 'food-drumstick',
-        text: 'Grilled Chicken + Quinoa',
-        description:
-          'Grill a seasoned chicken breast and serve it with 1 cup cooked quinoa and a mix of steamed vegetables like carrots, peas, and broccoli. A hearty and nutritious plate.',
-      });
-      newSuggestions.push({
-        icon: 'food-fork-drink',
-        text: 'Veggie Stir-fry with Rice',
-        description:
-          'Sauté bell peppers, onions, broccoli, and snap peas in a bit of olive oil and soy sauce. Serve hot over a cup of cooked brown rice. Top with sesame seeds or a sprinkle of chili flakes.',
-      });
-      newSuggestions.push({
-        icon: 'rice',
-        text: 'Poke Bowl',
-        description:
-          'Fill a bowl with sushi rice, then add diced raw tuna or salmon, cucumber slices, avocado chunks, and shredded carrots. Drizzle with soy sauce or spicy mayo and garnish with sesame seeds.',
-      });
-    } else if (val < 1300) {
-      newSuggestions.push({
-        icon: 'noodles',
-        text: 'Pasta + Veggies',
-        description:
-          'Cook whole wheat pasta and toss with sautéed zucchini, bell peppers, and onions. Add a tomato-based sauce and top with a sprinkle of parmesan. Serve with a side salad if desired.',
-      });
-      newSuggestions.push({
-        icon: 'food-turkey',
-        text: 'Turkey Wrap',
-        description:
-          'Wrap slices of turkey breast, baby spinach, avocado slices, and hummus in a whole wheat tortilla. Serve with carrot sticks or cucumber rounds on the side.',
-      });
-      newSuggestions.push({
-        icon: 'hamburger',
-        text: 'Chicken Burger + Sweet Potato Fries',
-        description:
-          'Grill a chicken patty and place it in a whole grain bun with lettuce and tomato. Serve with oven-baked sweet potato fries seasoned with paprika and garlic powder.',
-      });
-    } else if (val < 1600) {
-      newSuggestions.push({
-        icon: 'hamburger',
-        text: 'Burger + Salad + Sweet Potato',
-        description:
-          'Cook a lean beef patty and place it in a bun with lettuce, tomato, and a light sauce. Serve with a side of mixed green salad and baked sweet potato wedges.',
-      });
-      newSuggestions.push({
-        icon: 'food-variant',
-        text: 'Steak + Mashed Potatoes',
-        description:
-          'Grill a medium-sized steak to your liking. Serve with creamy mashed potatoes and steamed broccoli or green beans. Add herbs or garlic butter for extra flavor.',
-      });
-      newSuggestions.push({
-        icon: 'food-drumstick',
-        text: 'Chicken Alfredo',
-        description:
-          'Cook fettuccine pasta and toss it in a creamy Alfredo sauce with grilled chicken slices. Garnish with parsley and grated parmesan cheese. Best served hot.',
-      });
-    } else {
-      newSuggestions.push({
-        icon: 'food-variant',
-        text: 'Full Day Meal Plan',
-        description:
-          'Start your day with oats topped with banana slices and a boiled egg. For lunch, have grilled chicken with rice and vegetables. Snack on yogurt with fruit. End your day with a bowl of soup and whole grain toast.',
-      });
-      newSuggestions.push({
-        icon: 'food-steak',
-        text: 'BBQ Ribs + Cornbread',
-        description:
-          'Slow-cook or grill pork ribs with barbecue sauce. Serve with freshly baked cornbread and a side of baked beans. A filling, southern-inspired meal.',
-      });
-      newSuggestions.push({
-        icon: 'food-croissant',
-        text: 'Big Breakfast',
-        description:
-          'Prepare 2 pancakes, scrambled eggs, 2 strips of bacon, and a side of crispy hash browns. Add a glass of orange juice or a cup of coffee for a full breakfast experience.',
-      });
-    }
+    // Determine the calorie range based on input
+    let range;
+    if (val < 400) range = '0-400';
+    else if (val < 700) range = '401-700';
+    else if (val < 1000) range = '701-1000';
+    else if (val < 1300) range = '1001-1300';
+    else if (val < 1600) range = '1301-1600';
+    else range = '1601+';
 
-    const withToggle = newSuggestions.map((item) => ({
-      ...item,
-      showDescription: false,
-    }));
-    setSuggestions(withToggle);
+    // Query Firestore for suggestions in the calorie range
+    try {
+      const q = query(
+        collection(db, 'caloriePlans'),
+        where('calorieRange', '==', range)
+      );
+      const querySnapshot = await getDocs(q);
+      const newSuggestions = querySnapshot.docs.map(doc => ({
+        ...doc.data(),
+        showDescription: false,
+      }));
+      setSuggestions(newSuggestions);
+    } catch (error) {
+      console.error('Error fetching calorie plans:', error);
+      setSuggestions([]);
+    }
   };
 
   const toggleDescription = (index) => {
@@ -151,12 +58,24 @@ export default function CaloriePlannerScreen() {
     setSuggestions(updated);
   };
 
+  // Set navigation options with back button in header
+  useEffect(() => {
+    navigation.setOptions({
+      title: 'Calorie Planner',
+      headerLeft: () => (
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginLeft: 15 }}>
+          <Text style={styles.backButtonText}>Back</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>🎯 Calorie Planner</Text>
       <TextInput
         placeholder="Enter target calories"
-        placeholderTextColor="#888"
+        placeholderTextColor="#FFFFFF"
         keyboardType="numeric"
         style={styles.input}
         value={target}
@@ -174,9 +93,9 @@ export default function CaloriePlannerScreen() {
             onPress={() => toggleDescription(index)}
             activeOpacity={0.8}
           >
-            <Icon name={item.icon} size={24} color="#ffcc00" style={styles.icon} />
+            <Icon name={item.icon} size={24} color="#FF6347" style={styles.icon} />
             <View style={styles.textWrapper}>
-              <Text style={styles.suggestionText}>{item.text}</Text>
+              <Text style={styles.suggestionText}>{item.name}</Text>
               {item.showDescription && (
                 <Text style={styles.descriptionText} numberOfLines={6}>
                   {item.description}
@@ -186,6 +105,13 @@ export default function CaloriePlannerScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* Bottom Back Button to match Gluten-Free page */}
+      <Button
+        title="Back to Home"
+        type="back"
+        onPress={() => navigation.navigate('Home')}
+      />
     </View>
   );
 }
@@ -193,35 +119,40 @@ export default function CaloriePlannerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#111',
+    backgroundColor: '#000000', // Matches Gluten-Free page
     padding: 20,
   },
   title: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: '600', // Matches Gluten-Free header font weight
+    color: '#FFFFFF', // Matches Gluten-Free text color
     marginBottom: 10,
     textAlign: 'center',
   },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold', // Matches Gluten-Free header button style
+    color: '#FFFFFF', // Matches Gluten-Free text color
+  },
   input: {
     borderWidth: 1,
-    borderColor: '#444',
-    backgroundColor: '#222',
-    color: '#fff',
+    borderColor: '#333333', // Darker border to match Gluten-Free card style
+    backgroundColor: '#222222', // Slightly lighter than Gluten-Free for contrast
+    color: '#FFFFFF',
     padding: 10,
     borderRadius: 10,
     marginBottom: 10,
   },
   button: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#FF6347', // Matches Gluten-Free badge and title container color
     padding: 12,
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 20,
   },
   buttonText: {
-    color: '#000',
-    fontWeight: 'bold',
+    color: '#FFFFFF', // Matches Gluten-Free text on buttons
+    fontWeight: 'bold', // Matches Gluten-Free button text
   },
   resultWrapper: {
     flex: 1,
@@ -229,12 +160,12 @@ const styles = StyleSheet.create({
   suggestion: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#222',
+    backgroundColor: '#000000', // Matches Gluten-Free card background
     padding: 12,
-    borderRadius: 12,
-    marginBottom: 10,
+    borderRadius: 10, // Matches Gluten-Free card radius
+    marginBottom: 15, // Matches Gluten-Free card spacing
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#333333', // Matches Gluten-Free card border
   },
   icon: {
     marginRight: 10,
@@ -245,14 +176,14 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   suggestionText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#FFFFFF', // Matches Gluten-Free dish name
+    fontSize: 18, // Matches Gluten-Free dish name size
+    fontWeight: 'bold', // Matches Gluten-Free dish name weight
     marginBottom: 4,
   },
   descriptionText: {
-    color: '#bbb',
-    fontSize: 14,
+    color: '#CCCCCC', // Matches Gluten-Free description text
+    fontSize: 16, // Matches Gluten-Free info text size
     lineHeight: 18,
     flexWrap: 'wrap',
   },
