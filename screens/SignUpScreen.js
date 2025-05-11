@@ -56,7 +56,7 @@ export default function SignUpScreen({ navigation }) {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       console.log("Signup Success:", userCredential.user);
-      navigation.navigate('SignInScreen'); // Ensure 'Home' exists in your navigation stack
+      navigation.navigate('SignInScreen');
     } catch (error) {
       console.log("Signup Error:", error.message);
       Alert.alert('Registration Failed', error.message);
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   button: {
-    backgroundColor: '#00cc99',
+    backgroundColor: '#FF6347',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   linkBold: {
-    color: '#00ccff',
+    color: '#FF6347',
     fontWeight: 'bold',
   },
 });

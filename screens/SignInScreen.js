@@ -11,8 +11,7 @@ import {
 } from 'react-native';
 import { Video } from 'expo-av';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase'; // Adjust the path based on your project structure
-
+import { auth } from '../firebase';
 import CustomInput from '../components/CustomInput';
 
 export default function SignInScreen({ navigation }) {
@@ -124,7 +123,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   button: {
-    backgroundColor: '#00cc99',
+    backgroundColor: '#FF6347',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
@@ -142,7 +141,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   linkBold: {
-    color: '#00ccff',
+    color: '#ff6666',
     fontWeight: 'bold',
   },
 });

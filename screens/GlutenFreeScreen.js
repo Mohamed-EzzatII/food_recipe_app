@@ -18,12 +18,15 @@ Notifications.setNotificationHandler({
   }),
 });
 
+// current navigation object
 const navigationRef = { current: null };
 
+// set the navigation object
 const setNavigationRef = (navigation) => {
   navigationRef.current = navigation;
 };
 
+// navigate
 const navigateFromNotification = (screen, params) => {
   if (navigationRef.current) {
     navigationRef.current.navigate(screen, params);
@@ -135,6 +138,7 @@ const showFavoriteNotification = async (name, id) => {
   }
 };
 
+// get the data from database
 const fetchRecipes = async (category) => {
   try {
     const q = query(collection(db, 'recipes'), where('category', '==', category));
@@ -170,7 +174,7 @@ const GlutenFree = ({ route }) => {
     loading: true,
   });
   const flatListRef = useRef(null);
-
+// notfication gurentted
   useEffect(() => {
     const setupNotifications = async () => {
       const hasPermission = await requestNotificationPermission();
@@ -179,7 +183,7 @@ const GlutenFree = ({ route }) => {
       }
     };
     setupNotifications();
-
+// get recipes
     const loadRecipes = async () => {
       try {
         const recipes = await fetchRecipes('Gluten Free');
@@ -200,11 +204,11 @@ const GlutenFree = ({ route }) => {
     };
     loadRecipes();
   }, []);
-
+//navigate
   useEffect(() => {
     setNavigationRef(navigation);
   }, [navigation]);
-
+//image size 
   useEffect(() => {
     const updateDimensions = () => {
       setState(prev => ({ ...prev, screenWidth: Dimensions.get('window').width }));
@@ -212,7 +216,7 @@ const GlutenFree = ({ route }) => {
     const subscription = Dimensions.addEventListener('change', updateDimensions);
     return () => subscription?.remove();
   }, []);
-
+// fav dish and pressed notification
   useEffect(() => {
     if (route?.params?.highlightDishId && state.dishes.length > 0) {
       const index = state.dishes.findIndex((dish) => dish.id === route.params.highlightDishId);
@@ -221,7 +225,7 @@ const GlutenFree = ({ route }) => {
       }
     }
   }, [route?.params?.highlightDishId, state.dishes]);
-
+// heart
   const toggleFavorite = async (dishId, dishName) => {
     try {
       setState(prev => ({
@@ -249,14 +253,14 @@ const GlutenFree = ({ route }) => {
       Alert.alert('Error', 'Failed to update favorites. Please try again.');
     }
   };
-
+// selected or not
   const toggleDishDetails = (dishId) => {
     setState(prev => ({
       ...prev,
       selectedDishId: prev.selectedDishId === dishId ? null : dishId,
     }));
   };
-
+// heart is changed(empty or not)
   const renderDish = ({ item }) => (
     <DishCard
       item={item}
@@ -266,7 +270,7 @@ const GlutenFree = ({ route }) => {
       screenWidth={state.screenWidth}
     />
   );
-
+// data not ready
   if (state.loading) {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
