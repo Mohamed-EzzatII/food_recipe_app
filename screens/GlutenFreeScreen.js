@@ -1,13 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Dimensions, Platform, Alert } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Dimensions, Alert, Platform, ActivityIndicator } from 'react-native';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { db, auth } from '../firebase';
-import {
-  collection, getDocs, query, where, doc, updateDoc, setDoc, getDoc, onSnapshot,
-} from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+import { db } from '../firebase';
+import { collection, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
 import Button from '../components/Button';
 import * as Notifications from 'expo-notifications';
 import * as Permissions from 'expo-permissions';
@@ -33,85 +30,176 @@ const navigateFromNotification = (screen, params) => {
   }
 };
 
+// Request notification permissions
 const requestNotificationPermission = async () => {
-  const { status } = await Notifications.requestPermissionsAsync();
-  return status === 'granted';
+  try {
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      const { status: existingStatus } = await Permissions.getAsync(Permissions.NOTIFICATIONS);
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Permissions.askAsync(Permissions.NOTIFICATIONS);
+        finalStatus = status;
+      }
+      console.log('Notification permission status:', finalStatus);
+      handlePermissionResult(finalStatus);
+      return finalStatus === 'granted';
+    } else if (Platform.OS === 'web') {
+      if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        console.log('Web notification permission:', permission);
+        return permission === 'granted';
+      } else {
+        console.log('Notification API not supported in this browser.');
+        return false;
+      }
+    }
+    return false;
+  } catch (error) {
+    console.error('Permission Request Error:', error);
+    return false;
+  }
+};
+
+const handlePermissionResult = (status) => {
+  switch (status) {
+    case 'granted':
+      console.log('Notification permissions granted.');
+      break;
+    case 'denied':
+      Alert.alert('Permission denied', 'Please enable notifications in your device settings.');
+      break;
+    case 'undetermined':
+      Alert.alert('Permission not determined', 'Please grant notification permissions.');
+      break;
+    default:
+      Alert.alert('Permission error', 'Notifications may not be supported on this device.');
+      break;
+  }
+};
+
+// Configure notification listeners
+const configureNotifications = () => {
+  if (Platform.OS === 'web') {
+    console.log('Notifications on web are limited; using browser notifications.');
+    return () => {};
+  }
+
+  const foregroundSubscription = Notifications.addNotificationReceivedListener((notification) => {
+    console.log('Notification received in foreground:', notification);
+  });
+
+  const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    const { dishId } = response.notification.request.content.data || {};
+    console.log('Notification tapped, dishId:', dishId);
+    if (dishId) {
+      navigateFromNotification('GlutenFree', { highlightDishId: dishId });
+    }
+  });
+
+  return () => {
+    foregroundSubscription.remove();
+    responseSubscription.remove();
+  };
+};
+
+// Show notification (with web fallback)
+const showFavoriteNotification = async (name, id) => {
+  if (Platform.OS === 'web') {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Dish Favorited', {
+        body: `${name} added to favorites!`,
+        data: { dishId: id },
+      });
+      console.log('Web notification triggered:', name);
+    } else {
+      console.log('Web notifications not supported or permission denied.');
+      Alert.alert('Favorited', `${name} added to favorites!`);
+    }
+  } else {
+    const { status } = await Permissions.getAsync(Permissions.NOTIFICATIONS);
+    if (status === 'granted') {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Dish Favorited',
+          body: `${name} added to favorites!`,
+          data: { dishId: id },
+          sound: true,
+        },
+        trigger: null,
+      }).then(() => console.log('Notification scheduled for', name))
+        .catch(error => console.error('Notification scheduling error:', error));
+    } else {
+      console.log('Notification permission not granted on mobile.');
+      Alert.alert('Favorited', `${name} added to favorites!`);
+    }
+  }
 };
 
 const fetchRecipes = async (category) => {
-  const q = query(collection(db, 'recipes'), where('category', '==', category));
-  const querySnapshot = await getDocs(q);
-  const imageMap = {
-    '1': require('../assets/grilled_chicken_salad.png'),
-    '2': require('../assets/Quinoa_Bowl.png'),
-    '3': require('../assets/Rice_Noodle_Stir-Fry.jpeg'),
-  };
-  return querySnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      image: imageMap[doc.id] || null,
+  try {
+    const q = query(collection(db, 'recipes'), where('category', '==', category));
+    const querySnapshot = await getDocs(q);
+    console.log('Query Snapshot:', querySnapshot.docs.map(doc => ({ id: doc.id, data: doc.data() })));
+    const imageMap = {
+      '1': require('../assets/grilled_chicken_salad.png'),
+      '2': require('../assets/Quinoa_Bowl.png'),
+      '3': require('../assets/Rice_Noodle_Stir-Fry.jpeg'),
     };
-  });
-};
-
-const fetchUserFavorites = (userId, dishes, setState) => {
-  if (!userId) return;
-  const userFavoritesRef = doc(db, 'users', userId);
-  return onSnapshot(userFavoritesRef, (doc) => {
-    if (doc.exists()) {
-      const userData = doc.data();
-      const favoriteIds = userData.favorites || [];
-      setState(prev => ({
-        ...prev,
-        dishes: prev.dishes.map(dish => ({
-          ...dish,
-          isFavorite: favoriteIds.includes(dish.id),
-        })),
-      }));
-    }
-  });
+    return querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      console.log('Processing doc:', doc.id, data);
+      return {
+        id: doc.id,
+        ...data,
+        image: imageMap[doc.id] || null,
+      };
+    });
+  } catch (error) {
+    console.error('Fetch Recipes Error:', error);
+    throw error;
+  }
 };
 
 const GlutenFree = ({ route }) => {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
-  const [user, setUser] = useState(null);
   const [state, setState] = useState({
     screenWidth: Dimensions.get('window').width,
     selectedDishId: null,
     dishes: [],
+    loading: true,
   });
+  const flatListRef = useRef(null);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
+    const setupNotifications = async () => {
+      const hasPermission = await requestNotificationPermission();
+      if (hasPermission) {
+        configureNotifications();
+      }
+    };
+    setupNotifications();
 
     const loadRecipes = async () => {
       try {
         const recipes = await fetchRecipes('Gluten Free');
+        console.log('Fetched Recipes:', recipes);
+        if (recipes.length === 0) {
+          console.log('No recipes found for category "Gluten Free"');
+        }
         setState(prev => ({
           ...prev,
-          dishes: recipes.map(dish => ({ ...dish, isFavorite: false })),
+          dishes: recipes,
+          loading: false,
         }));
       } catch (error) {
-        console.error('Error fetching recipes:', error);
-        Alert.alert('Error', 'Failed to load recipes.');
+        console.error('Error loading recipes:', error);
+        Alert.alert('Error', 'Failed to load recipes. Check console for details.');
+        setState(prev => ({ ...prev, loading: false }));
       }
     };
     loadRecipes();
-
-    return () => unsubscribeAuth();
   }, []);
-
-  useEffect(() => {
-    if (user) {
-      const unsubscribeFavorites = fetchUserFavorites(user.uid, state.dishes, setState);
-      return () => unsubscribeFavorites();
-    }
-  }, [user, state.dishes.length]);
 
   useEffect(() => {
     setNavigationRef(navigation);
@@ -125,21 +213,17 @@ const GlutenFree = ({ route }) => {
     return () => subscription?.remove();
   }, []);
 
-  const toggleDishDetails = (dishId) => {
-    setState(prev => ({
-      ...prev,
-      selectedDishId: prev.selectedDishId === dishId ? null : dishId,
-    }));
-  };
+  useEffect(() => {
+    if (route?.params?.highlightDishId && state.dishes.length > 0) {
+      const index = state.dishes.findIndex((dish) => dish.id === route.params.highlightDishId);
+      if (index !== -1 && flatListRef.current) {
+        flatListRef.current.scrollToIndex({ index, animated: true });
+      }
+    }
+  }, [route?.params?.highlightDishId, state.dishes]);
 
   const toggleFavorite = async (dishId, dishName) => {
-    if (!user) {
-      Alert.alert('Login Required', 'Please log in to favorite dishes.');
-      return;
-    }
-
     try {
-      // Optimistically update UI
       setState(prev => ({
         ...prev,
         dishes: prev.dishes.map(dish =>
@@ -147,40 +231,15 @@ const GlutenFree = ({ route }) => {
         ),
       }));
 
-      const userFavoritesRef = doc(db, 'users', user.uid);
-      const docSnap = await getDoc(userFavoritesRef);
-      const currentFavorites = docSnap.exists() ? docSnap.data().favorites || [] : [];
-      const isFavorited = !currentFavorites.includes(dishId);
-      
-      const updatedFavorites = isFavorited
-        ? [...currentFavorites, dishId]
-        : currentFavorites.filter(id => id !== dishId);
+      const recipeRef = doc(db, 'recipes', dishId);
+      const isFavorited = !state.dishes.find(dish => dish.id === dishId).isFavorite;
+      await updateDoc(recipeRef, { isFavorite: isFavorited });
 
-      if (docSnap.exists()) {
-        await updateDoc(userFavoritesRef, { favorites: updatedFavorites });
-      } else {
-        await setDoc(userFavoritesRef, { favorites: updatedFavorites });
-      }
-
-      // Show notification if favorited
       if (isFavorited) {
-        const hasPermission = await requestNotificationPermission();
-        if (hasPermission) {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'Dish Favorited',
-              body: `${dishName} added to favorites!`,
-              data: { dishId },
-            },
-            trigger: null,
-          });
-        } else {
-          Alert.alert('Favorited', `${dishName} added to favorites!`);
-        }
+        await showFavoriteNotification(dishName, dishId);
       }
     } catch (error) {
       console.error('Error updating favorites:', error);
-      // Revert UI if update fails
       setState(prev => ({
         ...prev,
         dishes: prev.dishes.map(dish =>
@@ -189,6 +248,13 @@ const GlutenFree = ({ route }) => {
       }));
       Alert.alert('Error', 'Failed to update favorites. Please try again.');
     }
+  };
+
+  const toggleDishDetails = (dishId) => {
+    setState(prev => ({
+      ...prev,
+      selectedDishId: prev.selectedDishId === dishId ? null : dishId,
+    }));
   };
 
   const renderDish = ({ item }) => (
@@ -201,14 +267,27 @@ const GlutenFree = ({ route }) => {
     />
   );
 
+  if (state.loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#FF6347" />
+        <Text style={styles.loadingText}>Loading recipes...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Gluten-Free Dishes</Text>
       <FlatList
+        ref={flatListRef}
         data={state.dishes}
         renderItem={renderDish}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContainer}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>No recipes found. Please check your Firestore data or category.</Text>
+        }
       />
       <Button title="Back to Home" type="back" onPress={() => navigation.navigate('Home')} />
     </View>
@@ -233,7 +312,7 @@ const DishCard = ({ item, isExpanded, toggleDishDetails, toggleFavorite, screenW
       <View style={[styles.imagePlaceholder, { height: screenWidth * 0.6 }]}>
         {item.image ? (
           <Image
-            source={item.image} // Use the require() result directly
+            source={item.image}
             style={[styles.dishImage, { height: screenWidth * 0.6 }]}
             onError={(e) => console.log(`Image load error for ${item.name}:`, e.nativeEvent.error)}
           />
@@ -245,7 +324,7 @@ const DishCard = ({ item, isExpanded, toggleDishDetails, toggleFavorite, screenW
       <View style={styles.titleContainer}>
         <View style={styles.titleTextContainer}>
           <Text style={styles.dishName}>{item.name}</Text>
-          {!isExpanded && <Text style={styles.descriptionText}>{item.description}</Text>}
+          {!isExpanded && <Text style={styles.descriptionText}>{item.description || 'No description'}</Text>}
         </View>
         <TouchableOpacity onPress={() => toggleFavorite(item.id, item.name)}>
           <Icon name={item.isFavorite ? 'heart' : 'heart-outline'} size={24} color="#FFFFFF" />
@@ -257,7 +336,7 @@ const DishCard = ({ item, isExpanded, toggleDishDetails, toggleFavorite, screenW
           <Text style={styles.ingredientsLabel}>Ingredients:</Text>
           <Text style={styles.ingredients}>{item.ingredients}</Text>
           <Text style={styles.preparationLabel}>Preparation:</Text>
-          <Text style={styles.preparation}>{item.preparation}</Text>
+          <Text style={styles.preparation}>{item.preparation || 'No preparation info'}</Text>
         </Animated.View>
       )}
     </TouchableOpacity>
@@ -266,6 +345,21 @@ const DishCard = ({ item, isExpanded, toggleDishDetails, toggleFavorite, screenW
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000', padding: 20 },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    marginTop: 20,
+    fontSize: 16,
+  },
+  emptyText: {
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 50,
+    fontSize: 18,
+  },
   header: { fontSize: 20, fontWeight: '600', color: '#FFFFFF', marginBottom: 20, textAlign: 'center' },
   listContainer: { paddingBottom: 20 },
   card: { backgroundColor: '#000000', borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: '#333333', overflow: 'hidden' },
@@ -278,7 +372,7 @@ const styles = StyleSheet.create({
   titleContainer: { backgroundColor: '#FF6347', padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   titleTextContainer: { flex: 1, marginRight: 10 },
   dishName: { fontSize: 18, fontWeight: 'bold', color: '#FFFFFF' },
-  descriptionText: { fontSize: 14, color: '#FFFFFF'},
+  descriptionText: { fontSize: 14, color: '#FFFFFF' },
   infoContainer: { padding: 15 },
   calories: { fontSize: 16, fontWeight: 'normal', color: '#FFFFFF', marginBottom: 10 },
   ingredientsLabel: { fontSize: 16, fontWeight: 'bold', color: '#FF6347', marginBottom: 5 },
